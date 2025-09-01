@@ -8,13 +8,77 @@ import { randomUUID } from 'crypto';
 const router = express.Router();
 
 // Upload image
+// router.post('/', upload.single('image'), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ error: 'No file uploaded' });
+//     }
+
+//     validateFile(req.file);
+
+//     const {
+//       width = 0,
+//       height = 0,
+//       alt = '',
+//       tags = [],
+//       custom = {},
+//     } = req.body;
+
+//     // Upload to storage (Cloudinary or Vercel Blob)
+//     const uploadResult = await uploadFile(
+//       req.file.buffer,
+//       req.file.originalname,
+//       req.file.mimetype
+//     );
+
+//     const record = {
+//       id: randomUUID(),
+//       filename: req.file.originalname,
+//       url: uploadResult.url,
+//       storage: {
+//         provider: uploadResult.provider,
+//         ...uploadResult.providerData,
+//       },
+//       title: req.body.title || req.file.originalname.split('.')[0],
+//       alt: String(alt),
+//       tags: normalizeTags(tags),
+//       custom: parseCustomData(custom),
+//       size: req.file.size,
+//       width: parseInt(width) || 0,
+//       height: parseInt(height) || 0,
+//       mimetype: req.file.mimetype,
+//       uploadedAt: new Date().toISOString(),
+//       updatedAt: new Date().toISOString(),
+//     };
+
+//     const db = await readDB();
+//     db.push(record);
+//     await writeDB(db);
+
+//     res.status(201).json(record);
+//   } catch (err) {
+//     console.error('Upload error:', err);
+//     res.status(400).json({
+//       error: 'Upload failed',
+//       message: err.message,
+//     });
+//   }
+// });
+// In your upload route - add detailed logging
 router.post('/', upload.single('image'), async (req, res) => {
+  console.log('Upload request received');
+
   try {
     if (!req.file) {
+      console.log('No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    validateFile(req.file);
+    console.log('File details:', {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
 
     const {
       width = 0,
@@ -23,44 +87,38 @@ router.post('/', upload.single('image'), async (req, res) => {
       tags = [],
       custom = {},
     } = req.body;
+    console.log('Body data:', { width, height, alt, tags, custom });
 
-    // Upload to storage (Cloudinary or Vercel Blob)
-    const uploadResult = await uploadFile(
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype
-    );
+    const filename = generateSafeFilename(req.file.originalname);
+    console.log('Generated filename:', filename);
 
-    const record = {
-      id: randomUUID(),
-      filename: req.file.originalname,
-      url: uploadResult.url,
-      storage: {
-        provider: uploadResult.provider,
-        ...uploadResult.providerData,
-      },
-      title: req.body.title || req.file.originalname.split('.')[0],
-      alt: String(alt),
-      tags: normalizeTags(tags),
-      custom: parseCustomData(custom),
-      size: req.file.size,
-      width: parseInt(width) || 0,
-      height: parseInt(height) || 0,
-      mimetype: req.file.mimetype,
-      uploadedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    let fileUrl;
+    let storageInfo = {};
 
-    const db = await readDB();
-    db.push(record);
-    await writeDB(db);
+    if (USE_CLOUDINARY) {
+      console.log('Using Cloudinary upload');
+      const result = await uploadToCloudinary(req.file.buffer, filename);
+      fileUrl = result.secure_url;
+      storageInfo = { provider: 'cloudinary', public_id: result.public_id };
+    } else {
+      console.log('Using Vercel Blob upload');
+      const blob = await put(filename, req.file.buffer, {
+        access: 'public',
+        contentType: req.file.mimetype,
+      });
+      fileUrl = blob.url;
+      storageInfo = { provider: 'vercel-blob', blobUrl: blob.url };
+    }
 
-    res.status(201).json(record);
+    console.log('File uploaded successfully:', fileUrl);
+
+    // ... rest of your code
   } catch (err) {
-    console.error('Upload error:', err);
+    console.error('UPLOAD ERROR DETAILS:', err);
     res.status(400).json({
       error: 'Upload failed',
       message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     });
   }
 });
@@ -134,36 +192,93 @@ router.post('/bulk', uploadMultiple.array('images', 10), async (req, res) => {
 });
 
 // Get all images
+// router.get('/', async (req, res) => {
+//   const { search = '', tag = '', page = '1', limit = '20' } = req.query;
+//   const p = Math.max(1, parseInt(page));
+//   const l = Math.min(100, Math.max(1, parseInt(limit)));
+
+//   const db = await readDB();
+//   let items = db;
+
+//   if (search) {
+//     const q = String(search).toLowerCase();
+//     items = items.filter(
+//       (r) =>
+//         r.title?.toLowerCase().includes(q) ||
+//         r.alt?.toLowerCase().includes(q) ||
+//         r.tags?.some((t) => t.toLowerCase().includes(q))
+//     );
+//   }
+
+//   if (tag) {
+//     const t = String(tag).toLowerCase();
+//     items = items.filter((r) =>
+//       r.tags?.map((x) => x.toLowerCase()).includes(t)
+//     );
+//   }
+
+//   const total = items.length;
+//   const start = (p - 1) * l;
+//   const paged = items.slice(start, start + l);
+
+//   res.json({ items: paged, total, page: p, limit: l });
+// });
 router.get('/', async (req, res) => {
-  const { search = '', tag = '', page = '1', limit = '20' } = req.query;
-  const p = Math.max(1, parseInt(page));
-  const l = Math.min(100, Math.max(1, parseInt(limit)));
+  try {
+    console.log('List images request:', req.query);
 
-  const db = await readDB();
-  let items = db;
+    const { search = '', tag = '', page = '1', limit = '20' } = req.query;
+    const p = Math.max(1, parseInt(page));
+    const l = Math.min(100, Math.max(1, parseInt(limit)));
 
-  if (search) {
-    const q = String(search).toLowerCase();
-    items = items.filter(
-      (r) =>
-        r.title?.toLowerCase().includes(q) ||
-        r.alt?.toLowerCase().includes(q) ||
-        r.tags?.some((t) => t.toLowerCase().includes(q))
-    );
+    console.log('Reading database...');
+    const db = await readDB();
+    console.log(`Found ${db.length} images in database`);
+
+    let items = db;
+
+    // Filter by search
+    if (search) {
+      const q = String(search).toLowerCase();
+      items = items.filter(
+        (r) =>
+          r.title?.toLowerCase().includes(q) ||
+          r.alt?.toLowerCase().includes(q) ||
+          r.tags?.some((t) => t.toLowerCase().includes(q))
+      );
+      console.log(`After search filter: ${items.length} images`);
+    }
+
+    // Filter by tag
+    if (tag) {
+      const t = String(tag).toLowerCase();
+      items = items.filter((r) =>
+        r.tags?.map((x) => x.toLowerCase()).includes(t)
+      );
+      console.log(`After tag filter: ${items.length} images`);
+    }
+
+    // Pagination
+    const total = items.length;
+    const start = (p - 1) * l;
+    const paged = items.slice(start, start + l);
+
+    console.log(`Returning page ${p} of ${Math.ceil(total / l)}`);
+
+    res.json({
+      items: paged,
+      total,
+      page: p,
+      limit: l,
+    });
+  } catch (error) {
+    console.error('LIST IMAGES ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to list images',
+      message: error.message,
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
+    });
   }
-
-  if (tag) {
-    const t = String(tag).toLowerCase();
-    items = items.filter((r) =>
-      r.tags?.map((x) => x.toLowerCase()).includes(t)
-    );
-  }
-
-  const total = items.length;
-  const start = (p - 1) * l;
-  const paged = items.slice(start, start + l);
-
-  res.json({ items: paged, total, page: p, limit: l });
 });
 
 // Get single image
