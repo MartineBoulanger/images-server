@@ -16,8 +16,8 @@ export const upload = multer({
     else cb(new Error('Unsupported file type'));
   },
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
-    files: 1, // Only one file at a time
+    fileSize: 5 * 1024 * 1024, // REDUCE to 5MB for testing
+    files: 1,
   },
 });
 
@@ -28,7 +28,7 @@ export const uploadMultiple = multer({
     else cb(new Error('Unsupported file type'));
   },
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB per file
+    fileSize: 5 * 1024 * 1024, // 5MB per file
     files: 10, // Maximum 10 files at once
   },
 });
