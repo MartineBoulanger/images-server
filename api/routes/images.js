@@ -1,4 +1,3 @@
-// routes/images.js
 import express from 'express';
 import { upload, uploadMultiple } from '../config/multer.js';
 import { readDB, writeDB } from '../config/database.js';

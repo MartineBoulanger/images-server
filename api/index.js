@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import imagesRouter from './routes/images.js';
 import healthRouter from './routes/health.js';
 import batchRouter from './routes/batch.js';
@@ -19,6 +20,17 @@ app.use('/api/health', healthRouter);
 app.use('/api/images', imagesRouter);
 app.use('/api/images/batch', batchRouter);
 app.use('/api/debug', debugRouter);
+
+app.use(
+  cors({
+    origin: [
+      'http://localhost:3000',
+      'https://www.petmastersleague.com',
+      'https://pet-tourneys.vercel.app',
+    ],
+    credentials: true,
+  })
+);
 
 // 404 handler
 app.use('*', (req, res) => {

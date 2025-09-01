@@ -1,4 +1,3 @@
-// config/multer.js - Ensure this exists
 import multer from 'multer';
 
 const allowedTypes = new Set([
