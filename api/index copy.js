@@ -6,7 +6,6 @@ import fsp from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
-import { put, del } from '@vercel/blob';
 import { v2 as cloudinary } from 'cloudinary';
 
 // ===== Config =====
