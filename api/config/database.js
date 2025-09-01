@@ -15,15 +15,24 @@ if (!fs.existsSync(DATA_IMAGES_FILE))
 
 export async function readDB() {
   try {
+    // Try to read from file first
     const raw = await fsp.readFile(DATA_IMAGES_FILE, 'utf-8');
     return JSON.parse(raw);
   } catch (error) {
-    return [];
+    console.warn('File read failed, using in-memory DB:', error);
+    return inMemoryDB;
   }
 }
 
 export async function writeDB(data) {
-  const tmp = DATA_IMAGES_FILE + '.tmp';
-  await fsp.writeFile(tmp, JSON.stringify(data, null, 2));
-  await fsp.rename(tmp, DATA_IMAGES_FILE);
+  try {
+    inMemoryDB = data;
+    // Try to write to file (may fail on Vercel)
+    const tmp = DATA_IMAGES_FILE + '.tmp';
+    await fsp.writeFile(tmp, JSON.stringify(data, null, 2));
+    await fsp.rename(tmp, DATA_IMAGES_FILE);
+  } catch (error) {
+    console.warn('File write failed, using in-memory only:', error);
+    inMemoryDB = data;
+  }
 }
