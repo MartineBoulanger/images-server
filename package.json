@@ -2,21 +2,28 @@
   "name": "pml-images-server",
   "version": "1.0.0",
   "description": "image hosting server for pet masters league",
-  "main": "index.js",
+  "main": "api/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vercel dev",
+    "build": "echo 'No build step needed'",
+    "start": "vercel dev"
   },
   "keywords": [],
   "author": "Martine Boulanger",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@vercel/blob": "^1.1.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "multer": "^2.0.2"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "vercel": "^46.1.1"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
